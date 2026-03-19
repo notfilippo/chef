@@ -5,6 +5,7 @@ from prompt_toolkit.formatted_text import HTML
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.rule import Rule
+from rich.syntax import Syntax
 
 from ..context import Context
 
@@ -24,6 +25,8 @@ async def confirm_op(contexts: list[Context]) -> list[Context]:
             console.print(Rule(f"[bold]{i}/{total}[/bold]", style="bright_black"))
             console.print()
             console.print(Markdown(ctx.value))
+            if ctx.diff:
+                console.print(Syntax(ctx.diff, "diff", theme="ansi_dark"))
             console.print()
             console.print(Rule(style="bright_black"))
 
@@ -50,11 +53,7 @@ async def confirm_op(contexts: list[Context]) -> list[Context]:
                     )
                 ).strip()
                 value = f"{ctx.value}\n\nNote: {note}" if note else ctx.value
-                kept.append(
-                    Context(
-                        value=value, worktree=ctx.worktree, session_id=ctx.session_id
-                    )
-                )
+                kept.append(Context(value=value, session_id=ctx.session_id))
     except KeyboardInterrupt:
         console.print()
         raise

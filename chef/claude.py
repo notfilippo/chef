@@ -1,6 +1,7 @@
 import asyncio
 import json
 from collections.abc import Callable
+from pathlib import Path
 
 from .context import Context
 
@@ -26,8 +27,9 @@ def _format_tool_use(name: str, inp: dict) -> str:
 
 async def claude_call(
     ctx: Context,
+    cwd: Path,
     on_event: Callable[[str, str], None] | None = None,
-) -> tuple[str, str]:
+) -> Context:
     args = [
         "claude",
         "-p",
@@ -47,7 +49,7 @@ async def claude_call(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        cwd=ctx.worktree,
+        cwd=cwd,
         limit=2**24,
     )
 
@@ -84,5 +86,7 @@ async def claude_call(
     await proc.wait()
     if proc.returncode != 0:
         raise RuntimeError("".join(stderr_lines).strip())
+    if result is None:
+        raise RuntimeError("no result received from claude")
 
-    return result, session_id
+    return Context(result, session_id=session_id)

@@ -18,12 +18,7 @@ def fork_op(contexts: list[Context], arg: int | list[str]) -> list[Context]:
         for ctx in contexts:
             for _ in range(arg):
                 result.append(
-                    Context(
-                        value=ctx.value,
-                        worktree=ctx.worktree,
-                        session_id=ctx.session_id,
-                        forked=True,
-                    )
+                    Context(value=ctx.value, session_id=ctx.session_id, forked=True)
                 )
     else:
         console.print(
@@ -34,7 +29,6 @@ def fork_op(contexts: list[Context], arg: int | list[str]) -> list[Context]:
                 result.append(
                     Context(
                         value=f"{ctx.value}\n\n{variant}",
-                        worktree=ctx.worktree,
                         session_id=ctx.session_id,
                         forked=True,
                     )

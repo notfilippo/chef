@@ -6,48 +6,44 @@ from rich.live import Live
 from ..claude import claude_call
 from ..context import Context
 from .display import TaskDisplay
-from .worktree import get_diff, has_changes, pool
+from .worktree import get_diff, worktree
+
+console = Console(stderr=True)
+
+_REDUCE_PROMPT = """\
+Complete the task precisely. Make all changes directly in the codebase.
+Do not explain or summarize what you did.
+"""
 
 
 async def reduce_op(contexts: list[Context], prompt: str) -> list[Context]:
     assert contexts, "no input contexts"
     assert prompt, "missing prompt argument"
 
-    console = Console(stderr=True)
     console.print(f"[dim]reducing {len(contexts)} context(s)[/dim]")
-    has_worktrees = any(ctx.worktree for ctx in contexts)
 
-    if has_worktrees:
-        parts = []
-        for i, ctx in enumerate(contexts, 1):
-            diff = get_diff(ctx.worktree) if ctx.worktree else ""
-            part = f"--- Variant {i} ---\n{ctx.value}"
-            if diff:
-                part += f"\n\nChanges:\n```diff\n{diff}\n```"
-            parts.append(part)
-        combined = "\n\n".join(parts)
-    else:
-        combined = "\n\n".join(ctx.value for ctx in contexts)
+    parts = []
+    for i, ctx in enumerate(contexts, 1):
+        part = f"--- Variant {i} ---\n{ctx.value}"
+        if ctx.diff:
+            part += f"\n\nChanges:\n```diff\n{ctx.diff}\n```"
+        parts.append(part)
+    combined = "\n\n".join(parts)
 
     display = TaskDisplay(["reduce"])
     task = display.tasks[0]
 
-    wt = await asyncio.to_thread(pool.acquire, lambda status: task.set_status(status))
-    task.set_status("running")
+    async with worktree(lambda s: task.set_status(s)) as wt:
+        task.set_status("running")
+        merged_ctx = Context(value=f"{_REDUCE_PROMPT}\n{prompt}\n\n{combined}")
+        try:
+            with Live(display, console=console, refresh_per_second=4):
+                res_ctx = await claude_call(merged_ctx, wt, on_event=task.add_event)
+                res_ctx.diff = get_diff(wt)
+                task.set_status("done")
+        except Exception as e:
+            task.set_status("error")
+            task.add_event("text", str(e))
+            raise
 
-    try:
-        merged_ctx = Context(value=f"{prompt}\n\n{combined}", worktree=wt)
-        with Live(display, console=console, refresh_per_second=4):
-            result, session_id = await claude_call(merged_ctx, on_event=task.add_event)
-            task.set_status("done")
-
-        if not await asyncio.to_thread(has_changes, wt):
-            await asyncio.to_thread(pool.release, wt)
-            wt = None
-    except Exception as e:
-        task.set_status("error")
-        task.add_event("text", str(e))
-        await asyncio.to_thread(pool.release, wt)
-        raise
-
-    return [Context(value=result, session_id=session_id, worktree=wt)]
+    return [res_ctx]

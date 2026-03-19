@@ -8,6 +8,7 @@ from rich.table import Table
 from .context import Context
 from .parser import PipelineNode
 from .operators import (
+    apply_op,
     commit_op,
     confirm_op,
     fork_op,
@@ -16,7 +17,6 @@ from .operators import (
     review_comments_op,
     stdin_op,
     text_op,
-    remove_worktrees,
 )
 from .operators.checkpoint import CHECKPOINTS_DIR, save_checkpoint
 
@@ -36,6 +36,8 @@ async def run(
             try:
                 new_contexts: list[Context] | None = None
                 match stage.name:
+                    case "apply":
+                        new_contexts = await asyncio.to_thread(apply_op, contexts)
                     case "stdin":
                         new_contexts = stdin_op(contexts)
                     case "text":
@@ -53,14 +55,11 @@ async def run(
                     case "reduce":
                         new_contexts = await reduce_op(contexts, stage.arg)
                     case "commit":
-                        new_contexts = await asyncio.to_thread(
-                            commit_op, contexts, stage.arg
-                        )
+                        new_contexts = await commit_op(contexts, stage.arg)
                     case _:
                         raise AssertionError(f"unknown operator: {stage.name!r}")
 
                 if new_contexts is not None:
-                    await asyncio.to_thread(remove_worktrees, contexts)
                     contexts = new_contexts
                     uid = uuid.uuid4().hex[:8]
                     await asyncio.to_thread(
@@ -71,7 +70,6 @@ async def run(
             except AssertionError as e:
                 raise AssertionError(f"[{stage.name}] {e}") from e
     finally:
-        await asyncio.to_thread(remove_worktrees, contexts)
         if checkpoints:
             console.print()
             console.print(Rule("checkpoints", style="bright_black"))

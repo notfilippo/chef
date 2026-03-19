@@ -38,8 +38,11 @@ A recipe is a sequence of operators separated by `|`. Each operator receives a l
 |---|---|
 | `map "prompt"` | Run Claude on each context in parallel (uses worktree pool) |
 | `reduce "prompt"` | Merge all contexts into one with Claude |
+| `commit` | Generate a commit message from the diff and commit |
+| `commit "hint"` | Same, with a hint to guide the message |
 | `fork N` | Duplicate each context N times |
 | `fork "a" "b"` | Fork into variants, appending each string |
+| `apply` | Apply all context diffs to the local working tree; opens configured `git difftool` if available |
 | `confirm` | Interactively review and keep/discard contexts |
 
 ## Examples
