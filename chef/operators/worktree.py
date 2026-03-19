@@ -9,24 +9,35 @@ from pathlib import Path
 POOL_DIR = Path.home() / ".cache" / "chef" / "worktrees"
 
 
-def get_diff(worktree: Path) -> str:
-    result = subprocess.run(
-        ["git", "diff", "HEAD"],
-        cwd=worktree,
-        capture_output=True,
-        text=True,
+def get_repo_root() -> Path:
+    return Path(
+        subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], text=True
+        ).strip()
     )
-    return result.stdout.strip()
+
+
+def get_diff(path: Path) -> str:
+    return subprocess.check_output(["git", "diff", "HEAD"], cwd=path, text=True).strip()
+
+
+def git_apply(path: Path, diff: str, three_way: bool = False) -> None:
+    if not diff.endswith("\n"):
+        diff += "\n"
+    cmd = ["git", "apply"]
+    if three_way:
+        cmd.append("--3way")
+    result = subprocess.run(cmd, input=diff, cwd=path, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            result.stderr.strip() or f"git apply failed (exit {result.returncode})"
+        )
 
 
 def acquire(on_status: Callable[[str], None] | None = None) -> Path:
     POOL_DIR.mkdir(parents=True, exist_ok=True)
 
-    repo_root = Path(
-        subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"], text=True
-        ).strip()
-    )
+    repo_root = get_repo_root()
 
     head = subprocess.check_output(
         ["git", "-C", repo_root, "rev-parse", "HEAD"],

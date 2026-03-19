@@ -33,17 +33,17 @@ async def reduce_op(contexts: list[Context], prompt: str) -> list[Context]:
     display = TaskDisplay(["reduce"])
     task = display.tasks[0]
 
-    async with worktree(lambda s: task.set_status(s)) as wt:
-        task.set_status("running")
-        merged_ctx = Context(value=f"{_REDUCE_PROMPT}\n{prompt}\n\n{combined}")
-        try:
-            with Live(display, console=console, refresh_per_second=4):
+    with Live(display, console=console, refresh_per_second=4):
+        async with worktree(lambda s: task.set_status(s)) as wt:
+            task.set_status("running")
+            merged_ctx = Context(value=f"{_REDUCE_PROMPT}\n{prompt}\n\n{combined}")
+            try:
                 res_ctx = await claude_call(merged_ctx, wt, on_event=task.add_event)
                 res_ctx.diff = get_diff(wt)
                 task.set_status("done")
-        except Exception as e:
-            task.set_status("error")
-            task.add_event("text", str(e))
-            raise
+            except Exception as e:
+                task.set_status("error")
+                task.add_event("text", str(e))
+                raise
 
     return [res_ctx]
