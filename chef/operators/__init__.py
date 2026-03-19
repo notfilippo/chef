@@ -1,3 +1,4 @@
+from .commit import commit_op
 from .confirm import confirm_op
 from .fork import fork_op
 from .map import map_op
@@ -8,6 +9,7 @@ from .text import text_op
 from .worktree import remove_worktrees
 
 __all__ = [
+    "commit_op",
     "confirm_op",
     "fork_op",
     "map_op",

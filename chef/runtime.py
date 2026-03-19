@@ -8,6 +8,7 @@ from rich.table import Table
 from .context import Context
 from .parser import PipelineNode
 from .operators import (
+    commit_op,
     confirm_op,
     fork_op,
     map_op,
@@ -51,6 +52,10 @@ async def run(
                         new_contexts = fork_op(contexts, stage.arg)
                     case "reduce":
                         new_contexts = await reduce_op(contexts, stage.arg)
+                    case "commit":
+                        new_contexts = await asyncio.to_thread(
+                            commit_op, contexts, stage.arg
+                        )
                     case _:
                         raise AssertionError(f"unknown operator: {stage.name!r}")
 
