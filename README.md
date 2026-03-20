@@ -5,7 +5,7 @@ Compose agentic workflows as recipes — pipelines of operators that pass contex
 ## Install
 
 ```bash
-uv tool install .
+uv tool install --from git+https://github.com/notfilippo/chef chef
 ```
 
 Requires: [`claude`](https://github.com/anthropics/claude-code) CLI and [`gh`](https://cli.github.com/) CLI (for GitHub operators).
