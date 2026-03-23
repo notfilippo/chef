@@ -30,6 +30,7 @@ A recipe is a sequence of operators separated by `|`. Each operator receives a l
 | `text "a" "b"` | Create contexts from literal strings |
 | `review_comments "URL"` | Fetch unresolved PR review comments from GitHub |
 | `stdin` | Read one context per line from stdin |
+| `stdin "sep"` | Read from stdin, splitting on a custom separator instead of newlines |
 | _(use `--from <uuid>`)_ | Resume from an auto-saved checkpoint |
 
 ### Transforms
@@ -38,18 +39,25 @@ A recipe is a sequence of operators separated by `|`. Each operator receives a l
 |---|---|
 | `map "prompt"` | Run Claude on each context in parallel (uses worktree pool) |
 | `reduce "prompt"` | Merge all contexts into one with Claude |
-| `commit` | Generate a commit message from the diff and commit |
-| `commit "hint"` | Same, with a hint to guide the message |
 | `fork N` | Duplicate each context N times |
 | `fork "a" "b"` | Fork into variants, appending each string |
 | `apply` | Apply all context diffs to the local working tree; opens configured `git difftool` if available |
-| `confirm` | Interactively review and keep/discard contexts |
+| `review` | Interactively review contexts one by one with keyboard controls |
+
+`review` displays each context (and its diff, if any) then waits for a keypress:
+
+| Key | Action |
+|---|---|
+| `e` | Open `$EDITOR` to edit the context value |
+| `d` | Open `git difftool` to edit the diff in a temporary worktree (shown only when a diff is present) |
+| `y` / Enter | Keep and advance to the next context |
+| `n` | Discard this context |
 
 ## Examples
 
 ```bash
 # Address PR review comments
-chef 'review_comments "https://github.com/owner/repo/pull/42" | confirm | map "Address this review comment"'
+chef 'review_comments "https://github.com/owner/repo/pull/42" | review | map "Address this review comment"'
 
 # Explore multiple approaches in parallel
 chef 'text "refactor the auth module" | fork "use JWT" "use sessions" | map "implement this approach"'

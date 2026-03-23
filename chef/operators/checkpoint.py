@@ -18,6 +18,8 @@ def save_checkpoint(path: Path, contexts: list[Context]) -> None:
 
 def load_checkpoint(uid: str) -> list[Context]:
     path = CHECKPOINTS_DIR / f"{uid}.json"
+    if not path.exists():
+        raise SystemExit(f"checkpoint not found: {uid} ({path})")
     contexts = [Context(**item) for item in json.loads(path.read_text())]
     console.print(f"[dim]loaded {len(contexts)} context(s) from checkpoint {uid}[/dim]")
     return contexts

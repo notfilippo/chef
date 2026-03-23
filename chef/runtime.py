@@ -9,11 +9,10 @@ from .context import Context
 from .parser import PipelineNode
 from .operators import (
     apply_op,
-    commit_op,
-    confirm_op,
     fork_op,
     map_op,
     reduce_op,
+    review_op,
     review_comments_op,
     stdin_op,
     text_op,
@@ -39,7 +38,7 @@ async def run(
                     case "apply":
                         new_contexts = await asyncio.to_thread(apply_op, contexts)
                     case "stdin":
-                        new_contexts = stdin_op(contexts)
+                        new_contexts = stdin_op(contexts, stage.arg)
                     case "text":
                         new_contexts = text_op(contexts, stage.arg)
                     case "review_comments":
@@ -48,14 +47,12 @@ async def run(
                         )
                     case "map":
                         new_contexts = await map_op(contexts, stage.arg)
-                    case "confirm":
-                        new_contexts = await confirm_op(contexts)
+                    case "review":
+                        new_contexts = await review_op(contexts)
                     case "fork":
                         new_contexts = fork_op(contexts, stage.arg)
                     case "reduce":
                         new_contexts = await reduce_op(contexts, stage.arg)
-                    case "commit":
-                        new_contexts = await commit_op(contexts, stage.arg)
                     case _:
                         raise AssertionError(f"unknown operator: {stage.name!r}")
 
