@@ -13,7 +13,7 @@ from .operators import (
     map_op,
     reduce_op,
     review_op,
-    review_comments_op,
+    gh_pr_comments_op,
     stdin_op,
     text_op,
 )
@@ -41,9 +41,9 @@ async def run(
                         new_contexts = stdin_op(contexts, stage.arg)
                     case "text":
                         new_contexts = text_op(contexts, stage.arg)
-                    case "review_comments":
+                    case "gh_pr_comments":
                         new_contexts = await asyncio.to_thread(
-                            review_comments_op, contexts, stage.arg
+                            gh_pr_comments_op, contexts, stage.arg
                         )
                     case "map":
                         new_contexts = await map_op(contexts, stage.arg)

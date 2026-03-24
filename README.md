@@ -17,8 +17,6 @@ chef '<recipe>'
 chef --from <checkpoint-uuid> '<recipe>'
 ```
 
-After each step, a checkpoint is automatically saved to `~/.cache/chef/checkpoints/`. The UUIDs are printed at the end of every run so you can resume any step with `--from`.
-
 A recipe is a sequence of operators separated by `|`. Each operator receives a list of contexts and produces a new list.
 
 ## Operators
@@ -28,7 +26,7 @@ A recipe is a sequence of operators separated by `|`. Each operator receives a l
 | Operator | Description |
 |---|---|
 | `text "a" "b"` | Create contexts from literal strings |
-| `review_comments "URL"` | Fetch unresolved PR review comments from GitHub |
+| `gh_pr_comments "URL"` | Fetch unresolved PR review comments from GitHub |
 | `stdin` | Read one context per line from stdin |
 | `stdin "sep"` | Read from stdin, splitting on a custom separator instead of newlines |
 | _(use `--from <uuid>`)_ | Resume from an auto-saved checkpoint |
@@ -55,20 +53,56 @@ A recipe is a sequence of operators separated by `|`. Each operator receives a l
 
 ## Examples
 
+### Address PR review comments
+
+Fetch unresolved comments, let Claude fix each one in parallel, review the diffs, then apply:
+
 ```bash
-# Address PR review comments
-chef 'review_comments "https://github.com/owner/repo/pull/42" | review | map "Address this review comment"'
+chef 'gh_pr_comments "https://github.com/owner/repo/pull/42" | map "Address this review comment" | review | apply'
+```
 
-# Explore multiple approaches in parallel
-chef 'text "refactor the auth module" | fork "use JWT" "use sessions" | map "implement this approach"'
+### Explore multiple implementations
 
-# Resume an interrupted run (UUIDs printed at end of each run)
-chef --from abc12345 'reduce "pick the best approach"'
+Fork a task into variants, implement each in an isolated worktree, pick one, apply:
 
-# Pipe from another command
-gh pr list --json url -q '.[].url' | chef 'stdin | map "summarize this PR"'
+```bash
+chef 'text "refactor the auth module" | fork "use JWT" "use sessions" | map "implement this approach" | review | apply'
+```
+
+### Bulk edits from stdin
+
+Pipe file paths in, edit each one, apply all at once:
+
+```bash
+fd '\.go$' | chef 'stdin | map "add missing error handling" | apply'
 ```
 
 ## Worktree pool
 
-`map` runs each context in an isolated git worktree. Worktrees are pooled at `~/.cache/chef/worktrees/` and reused across runs (reset to `HEAD` on each acquire).
+`map` runs each context in an isolated git worktree so that parallel Claude sessions can edit files without interfering with each other or with your working tree.
+
+Worktrees are pooled at `~/.cache/chef/worktrees/` and reused across runs. When `map` needs a worktree it scans the pool for a free one tied to the same repository, resets it to `HEAD` (`git reset --hard` + `git clean -fd`), and locks it for the duration of the task. If none is free a new worktree is created with `git worktree add --detach`. On completion the lock is released and the worktree goes back into the pool — it is never deleted.
+
+This means the first run for a given repo may be slower (worktree creation), while subsequent runs reuse existing ones.
+
+## Checkpoints
+
+After every operator step chef saves the current list of contexts to `~/.cache/chef/checkpoints/<uuid>.json`. At the end of a run the UUIDs are printed alongside the step that produced them:
+
+```
+─────────────────── checkpoints ───────────────────
+ a1b2c3d4   map "Address this review comment"
+ e5f6a7b8   review
+```
+
+Pass any UUID to `--from` to resume a pipeline from that point:
+
+```bash
+# Skip re-running map; jump straight to apply
+chef --from e5f6a7b8 'apply'
+
+# Continue with a different follow-up step
+chef --from a1b2c3d4 'reduce "summarise all changes"'
+```
+
+Checkpoints are never cleaned up automatically — remove `~/.cache/chef/checkpoints/` manually if disk space is a concern.

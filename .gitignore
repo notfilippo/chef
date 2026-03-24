@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# LLM Coding Agents
+.claude/*.local.json

@@ -62,9 +62,9 @@ def _fetch_review_threads(owner: str, repo: str, number: str) -> list[dict]:
     return threads
 
 
-def review_comments_op(contexts: list[Context], url: str) -> list[Context]:
+def gh_pr_comments_op(contexts: list[Context], url: str) -> list[Context]:
     assert not contexts, (
-        "review_comments is a source operator and must be first in the pipeline"
+        "gh_pr_comments is a source operator and must be first in the pipeline"
     )
     assert url, "missing PR URL argument"
     m = re.search(r"github\.com/([^/]+)/([^/]+)/pull/(\d+)", url)
