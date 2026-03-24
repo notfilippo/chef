@@ -6,13 +6,14 @@ from rich.live import Live
 from ..claude import claude_call
 from ..context import Context
 from .display import TaskDisplay
-from .worktree import get_diff, worktree
+from .worktree import get_diff, get_repo_root, worktree
 
 console = Console(stderr=True)
 
 _MAP_PROMPT = """\
 Complete the task precisely. Make all changes directly in the codebase.
 Do not explain or summarize what you did.
+The original repository is at {repo_root}.
 """
 
 
@@ -29,7 +30,7 @@ async def map_op(contexts: list[Context], prompt: str) -> list[Context]:
             async with worktree(lambda s: task.set_status(s)) as wt:
                 task.set_status("running")
                 call_ctx = Context(
-                    value=f"{_MAP_PROMPT}\n{prompt}\n\n{ctx.value}",
+                    value=f"{_MAP_PROMPT.format(repo_root=get_repo_root())}\n{prompt}\n\n{ctx.value}",
                     session_id=ctx.session_id,
                     forked=ctx.forked,
                 )

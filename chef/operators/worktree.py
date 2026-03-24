@@ -8,6 +8,48 @@ from pathlib import Path
 
 POOL_DIR = Path.home() / ".cache" / "chef" / "worktrees"
 
+_bazel_output_base_cache: dict[str, str] = {}
+
+_SYMLINK_DIRS = ["node_modules", ".venv", "venv", "target"]
+
+
+def _get_bazel_output_base(repo_root: Path) -> str | None:
+    key = str(repo_root)
+    if key not in _bazel_output_base_cache:
+        result = subprocess.run(
+            ["bazel", "info", "output_base"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            _bazel_output_base_cache[key] = result.stdout.strip()
+        else:
+            return None
+    return _bazel_output_base_cache.get(key)
+
+
+def _setup_caches(wt: Path, repo_root: Path) -> None:
+    # Bazel: share output base so worktrees reuse already-built artifacts
+    output_base = _get_bazel_output_base(repo_root)
+    if output_base:
+        (wt / "user.bazelrc").write_text(f"startup --output_base={output_base}\n")
+
+    # Symlink dependency/build dirs from the main repo, but only if they are
+    # gitignored in the worktree (to avoid polluting git status).
+    for name in _SYMLINK_DIRS:
+        src = repo_root / name
+        dst = wt / name
+        if not src.exists() or dst.exists() or dst.is_symlink():
+            continue
+        ignored = subprocess.run(
+            ["git", "check-ignore", "-q", name],
+            cwd=wt,
+            capture_output=True,
+        )
+        if ignored.returncode == 0:
+            dst.symlink_to(src)
+
 
 def get_repo_root() -> Path:
     return Path(
@@ -32,6 +74,12 @@ def git_apply(path: Path, diff: str, three_way: bool = False) -> None:
         raise RuntimeError(
             result.stderr.strip() or f"git apply failed (exit {result.returncode})"
         )
+
+
+def _write_bazelrc(wt: Path, repo_root: Path) -> None:
+    output_base = _get_bazel_output_base(repo_root)
+    if output_base:
+        (wt / "user.bazelrc").write_text(f"startup --output_base={output_base}\n")
 
 
 def acquire(on_status: Callable[[str], None] | None = None) -> Path:
@@ -76,6 +124,7 @@ def acquire(on_status: Callable[[str], None] | None = None) -> Path:
             capture_output=True,
         )
 
+        _setup_caches(wt, repo_root)
         return wt
 
     repo_name = Path(repo_root).name
@@ -96,6 +145,7 @@ def acquire(on_status: Callable[[str], None] | None = None) -> Path:
     )
     (POOL_DIR / f"{entry_id}.lock").touch()
 
+    _setup_caches(wt, repo_root)
     return wt
 
 

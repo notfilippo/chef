@@ -5,7 +5,7 @@ import sys
 
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.rule import Rule
+from rich.text import Text
 
 from .operators.checkpoint import load_checkpoint
 from .parser import parse
@@ -39,5 +39,11 @@ def main():
         sys.exit(130)
     for i, ctx in enumerate(results):
         label = f"[bold]{i + 1}/{len(results)}[/bold]" if len(results) > 1 else ""
-        console.print(Rule(label, style="bright_black"))
+        console.print(
+            Text.from_markup(
+                f"[bright_black]·[/bright_black] {label}"
+                if label
+                else "[bright_black]·[/bright_black]"
+            )
+        )
         console.print(Markdown(ctx.value))

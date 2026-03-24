@@ -9,7 +9,6 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.text import Text
 
@@ -41,7 +40,9 @@ def _edit_diff_with_difftool(diff: str) -> str | None:
         subprocess.run(["git", "difftool", "-d", "-y"], cwd=repo_root)
         return get_diff(repo_root) or None
     finally:
-        subprocess.run(["git", "reset", "--hard", "HEAD"], cwd=repo_root, capture_output=True)
+        subprocess.run(
+            ["git", "reset", "--hard", "HEAD"], cwd=repo_root, capture_output=True
+        )
 
 
 async def review_op(contexts: list[Context]) -> list[Context]:
@@ -52,14 +53,12 @@ async def review_op(contexts: list[Context]) -> list[Context]:
     total = len(contexts)
     try:
         for i, ctx in enumerate(contexts, 1):
-            console.print()
-            console.print(Rule(f"[bold]{i}/{total}[/bold]", style="bright_black"))
+            console.rule(f"[bold]{i}/{total}[/bold]")
             console.print()
             console.print(Markdown(ctx.value))
             if ctx.diff:
                 console.print(Syntax(ctx.diff, "diff", theme="ansi_dark"))
             console.print()
-            console.print(Rule(style="bright_black"))
 
             with tempfile.TemporaryDirectory() as tmp:
                 value_path = Path(tmp) / "value.md"
@@ -72,9 +71,9 @@ async def review_op(contexts: list[Context]) -> list[Context]:
                     if ctx.diff:
                         hint.append(" d ", style="bold reverse")
                         hint.append(" diff  ")
-                    hint.append(" y ", style="bold reverse")
+                    hint.append(" k ", style="bold reverse")
                     hint.append(" keep  ")
-                    hint.append(" n ", style="bold reverse")
+                    hint.append(" s ", style="bold reverse")
                     hint.append(" skip")
                     console.print(hint)
 
@@ -89,10 +88,10 @@ async def review_op(contexts: list[Context]) -> list[Context]:
                         ctx = replace(ctx, diff=_edit_diff_with_difftool(ctx.diff))
                         if ctx.diff:
                             console.print(Syntax(ctx.diff, "diff", theme="ansi_dark"))
-                    elif key == "y" or key == "\r" or key == "\n":
+                    elif key == "k" or key == "\r" or key == "\n":
                         kept.append(ctx)
                         break
-                    elif key == "n":
+                    elif key == "s":
                         break
     except KeyboardInterrupt:
         console.print()

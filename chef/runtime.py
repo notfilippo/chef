@@ -2,8 +2,8 @@ import asyncio
 import uuid
 
 from rich.console import Console
-from rich.rule import Rule
 from rich.table import Table
+from rich.text import Text
 
 from .context import Context
 from .parser import PipelineNode
@@ -31,7 +31,11 @@ async def run(
     try:
         for i, stage in enumerate(pipeline.stages):
             if i > 0:
-                console.print(Rule(f"[bold]{stage.label}[/bold]", style="bright_black"))
+                console.print(
+                    Text.from_markup(
+                        f"[bright_black]·[/bright_black] [bold]{stage.label}[/bold]"
+                    )
+                )
             try:
                 new_contexts: list[Context] | None = None
                 match stage.name:
@@ -69,7 +73,11 @@ async def run(
     finally:
         if checkpoints:
             console.print()
-            console.print(Rule("checkpoints", style="bright_black"))
+            console.print(
+                Text.from_markup(
+                    "[bright_black]·[/bright_black] [bold]checkpoints[/bold]"
+                )
+            )
             table = Table.grid(padding=(0, 2))
             for label, uid in checkpoints:
                 table.add_row(f"[bold cyan]{uid}[/bold cyan]", f"[dim]{label}[/dim]")

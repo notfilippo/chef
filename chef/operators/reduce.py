@@ -6,13 +6,14 @@ from rich.live import Live
 from ..claude import claude_call
 from ..context import Context
 from .display import TaskDisplay
-from .worktree import get_diff, worktree
+from .worktree import get_diff, get_repo_root, worktree
 
 console = Console(stderr=True)
 
 _REDUCE_PROMPT = """\
 Complete the task precisely. Make all changes directly in the codebase.
 Do not explain or summarize what you did.
+The original repository is at {repo_root}.
 """
 
 
@@ -36,7 +37,9 @@ async def reduce_op(contexts: list[Context], prompt: str) -> list[Context]:
     with Live(display, console=console, refresh_per_second=4):
         async with worktree(lambda s: task.set_status(s)) as wt:
             task.set_status("running")
-            merged_ctx = Context(value=f"{_REDUCE_PROMPT}\n{prompt}\n\n{combined}")
+            merged_ctx = Context(
+                value=f"{_REDUCE_PROMPT.format(repo_root=get_repo_root())}\n{prompt}\n\n{combined}"
+            )
             try:
                 res_ctx = await claude_call(merged_ctx, wt, on_event=task.add_event)
                 res_ctx.diff = get_diff(wt)
