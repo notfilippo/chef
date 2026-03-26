@@ -1,6 +1,6 @@
 # chef
 
-Compose agentic workflows as recipes — pipelines of operators that pass contexts through Claude.
+Compose agentic workflows as shell pipelines — each `ch` invocation runs one operator, passing contexts as JSON between stages.
 
 ## Install
 
@@ -13,23 +13,37 @@ Requires: [`claude`](https://github.com/anthropics/claude-code) CLI and [`gh`](h
 ## Usage
 
 ```bash
-chef '<recipe>'
-chef --from <checkpoint-uuid> '<recipe>'
+ch <operator> [args...]
 ```
 
-A recipe is a sequence of operators separated by `|`. Each operator receives a list of contexts and produces a new list.
+Operators are chained with shell pipes. Each stage reads contexts from stdin and writes contexts to stdout. If stdin is raw text (not a checkpoint), one context is created per line. If stdout is a terminal the final result is rendered as markdown.
+
+## Shell completions
+
+```bash
+# bash — add to ~/.bashrc
+source <(ch completions bash)
+
+# zsh — add to ~/.zshrc
+source <(ch completions zsh)
+
+# fish — add to ~/.config/fish/config.fish
+ch completions fish | source
+# or as a file:
+ch completions fish > ~/.config/fish/completions/ch.fish
+```
 
 ## Operators
 
-### Sources (must be first)
+### Sources
 
 | Operator | Description |
 |---|---|
-| `text "a" "b"` | Create contexts from literal strings |
+| `checkpoint <uuid>` | Load contexts from a checkpoint |
 | `gh_pr_comments "URL"` | Fetch unresolved PR review comments from GitHub |
-| `stdin` | Read one context per line from stdin |
-| `stdin "sep"` | Read from stdin, splitting on a custom separator instead of newlines |
-| _(use `--from <uuid>`)_ | Resume from an auto-saved checkpoint |
+| `stdin "sep"` | Read from stdin splitting on a custom separator (default: newlines) |
+
+For plain line-delimited input, just pipe text directly — one context per line is created automatically. Use standard shell tools like `echo`, `printf`, or `fd` as sources.
 
 ### Transforms
 
@@ -58,7 +72,10 @@ A recipe is a sequence of operators separated by `|`. Each operator receives a l
 Fetch unresolved comments, let Claude fix each one in parallel, review the diffs, then apply:
 
 ```bash
-chef 'gh_pr_comments "https://github.com/owner/repo/pull/42" | map "Address this review comment" | review | apply'
+ch gh_pr_comments "https://github.com/owner/repo/pull/42" \
+  | ch map "Address this review comment" \
+  | ch review \
+  | ch apply
 ```
 
 ### Explore multiple implementations
@@ -66,7 +83,11 @@ chef 'gh_pr_comments "https://github.com/owner/repo/pull/42" | map "Address this
 Fork a task into variants, implement each in an isolated worktree, pick one, apply:
 
 ```bash
-chef 'text "refactor the auth module" | fork "use JWT" "use sessions" | map "implement this approach" | review | apply'
+echo "refactor the auth module" \
+  | ch fork "use JWT" "use sessions" \
+  | ch map "implement this approach" \
+  | ch review \
+  | ch apply
 ```
 
 ### Bulk edits from stdin
@@ -74,7 +95,13 @@ chef 'text "refactor the auth module" | fork "use JWT" "use sessions" | map "imp
 Pipe file paths in, edit each one, apply all at once:
 
 ```bash
-fd '\.go$' | chef 'stdin | map "add missing error handling" | apply'
+fd '\.go$' | ch map "add missing error handling" | ch apply
+```
+
+### Custom separator
+
+```bash
+cat notes.txt | ch stdin "---" | ch map "summarize"
 ```
 
 ## Worktree pool
@@ -87,22 +114,14 @@ This means the first run for a given repo may be slower (worktree creation), whi
 
 ## Checkpoints
 
-After every operator step chef saves the current list of contexts to `~/.cache/chef/checkpoints/<uuid>.json`. At the end of a run the UUIDs are printed alongside the step that produced them:
-
-```
-─────────────────── checkpoints ───────────────────
- a1b2c3d4   map "Address this review comment"
- e5f6a7b8   review
-```
-
-Pass any UUID to `--from` to resume a pipeline from that point:
+After every operator step `ch` saves the current list of contexts to `~/.cache/chef/checkpoints/<uuid>.json` and prints the UUID to stderr. Pipe a checkpoint file into any stage to resume from that point:
 
 ```bash
 # Skip re-running map; jump straight to apply
-chef --from e5f6a7b8 'apply'
+ch checkpoint e5f6a7b8 | ch apply
 
 # Continue with a different follow-up step
-chef --from a1b2c3d4 'reduce "summarise all changes"'
+ch checkpoint a1b2c3d4 | ch reduce "summarise all changes"
 ```
 
 Checkpoints are never cleaned up automatically — remove `~/.cache/chef/checkpoints/` manually if disk space is a concern.

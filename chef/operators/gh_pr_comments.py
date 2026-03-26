@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import subprocess
@@ -5,6 +6,7 @@ import subprocess
 from rich.console import Console
 
 from ..context import Context
+from .registry import operator
 
 console = Console(stderr=True)
 
@@ -62,18 +64,20 @@ def _fetch_review_threads(owner: str, repo: str, number: str) -> list[dict]:
     return threads
 
 
-def gh_pr_comments_op(contexts: list[Context], url: str) -> list[Context]:
+@operator
+async def gh_pr_comments(contexts: list[Context], arg: str) -> list[Context]:
+    """Fetch unresolved GitHub PR review comments."""
     assert not contexts, (
         "gh_pr_comments is a source operator and must be first in the pipeline"
     )
-    assert url, "missing PR URL argument"
-    m = re.search(r"github\.com/([^/]+)/([^/]+)/pull/(\d+)", url)
-    assert m, f"cannot parse GitHub PR URL: {url!r}"
+    assert arg, "missing PR URL argument"
+    m = re.search(r"github\.com/([^/]+)/([^/]+)/pull/(\d+)", arg)
+    assert m, f"cannot parse GitHub PR URL: {arg!r}"
     owner, repo, number = m.group(1), m.group(2), m.group(3)
 
     console.print(f"[dim]fetching review comments for {owner}/{repo}#{number}[/dim]")
     comments = []
-    for thread in _fetch_review_threads(owner, repo, number):
+    for thread in await asyncio.to_thread(_fetch_review_threads, owner, repo, number):
         if thread["isResolved"]:
             continue
         for node in thread["comments"]["nodes"]:

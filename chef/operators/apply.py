@@ -5,12 +5,15 @@ from dataclasses import replace
 from rich.console import Console
 
 from ..context import Context
+from .registry import operator
 from .worktree import get_repo_root, git_apply
 
 console = Console(stderr=True)
 
 
-def apply_op(contexts: list[Context]) -> list[Context]:
+@operator
+async def apply(contexts: list[Context], arg: None = None) -> list[Context]:
+    """Apply diffs to the working tree."""
     assert contexts, "no input contexts"
 
     diffs = [ctx.diff for ctx in contexts if ctx.diff]
@@ -31,7 +34,7 @@ def apply_op(contexts: list[Context]) -> list[Context]:
         ["git", "diff", "--stat"], cwd=repo_root, capture_output=True, text=True
     )
     if stat.stdout.strip():
-        console.print(stat.stdout.rstrip())
+        console.print(f"[dim]{stat.stdout.rstrip()}[/dim]")
 
     if sys.stderr.isatty():
         diff_tool = subprocess.run(

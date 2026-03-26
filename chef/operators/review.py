@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 import tempfile
 import termios
 import tty
@@ -13,19 +12,21 @@ from rich.syntax import Syntax
 from rich.text import Text
 
 from ..context import Context
+from .registry import operator
 from .worktree import get_diff, get_repo_root, git_apply
 
 console = Console(stderr=True)
 
 
 def _getch() -> str:
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        return sys.stdin.read(1)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    with open("/dev/tty") as tty_fd:
+        fd = tty_fd.fileno()
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            return tty_fd.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
 def _open_editor(path: Path) -> None:
@@ -45,9 +46,11 @@ def _edit_diff_with_difftool(diff: str) -> str | None:
         )
 
 
-async def review_op(contexts: list[Context]) -> list[Context]:
+@operator
+async def review(contexts: list[Context], arg: None = None) -> list[Context]:
+    """Interactively review and edit contexts."""
     assert contexts, "no input contexts"
-    assert sys.stdin.isatty(), "review requires an interactive terminal"
+    assert os.path.exists("/dev/tty"), "review requires an interactive terminal"
 
     kept = []
     total = len(contexts)

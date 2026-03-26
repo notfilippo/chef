@@ -1,11 +1,14 @@
 from rich.console import Console
 
 from ..context import Context
+from .registry import operator
 
 console = Console(stderr=True)
 
 
-def fork_op(contexts: list[Context], arg: int | list[str]) -> list[Context]:
+@operator
+async def fork(contexts: list[Context], arg: int | list[str]) -> list[Context]:
+    """Duplicate contexts into variants."""
     assert contexts, "no input contexts"
     assert arg, "missing fork argument"
 
