@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from typing import Callable
 
+
 @dataclass
 class OperatorMeta:
     name: str
     description: str
     fn: Callable
+
 
 _registry: dict[str, OperatorMeta] = {}
 

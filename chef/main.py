@@ -46,7 +46,9 @@ def _write_output(contexts: list[Context]) -> None:
         for i, ctx in enumerate(contexts):
             if len(contexts) > 1:
                 err_console.print(
-                    Text.from_markup(f"[bright_black]·[/bright_black] [bold]{i + 1}/{len(contexts)}[/bold]")
+                    Text.from_markup(
+                        f"[bright_black]·[/bright_black] [bold]{i + 1}/{len(contexts)}[/bold]"
+                    )
                 )
             console.print(Markdown(ctx.value))
     else:

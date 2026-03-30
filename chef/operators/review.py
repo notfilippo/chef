@@ -24,21 +24,38 @@ def _getch() -> str:
         old = termios.tcgetattr(fd)
         try:
             tty.setraw(fd)
-            return tty_fd.read(1)
+            ch = tty_fd.read(1)
+            if ch == "\x03":
+                raise KeyboardInterrupt
+            return ch
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
 def _open_editor(path: Path) -> None:
     editor = os.environ.get("VISUAL") or os.environ.get("EDITOR", "vi")
-    subprocess.run([editor, str(path)])
+    tty_fd = os.open("/dev/tty", os.O_RDWR)
+    try:
+        subprocess.run([editor, str(path)], stdin=tty_fd, stdout=tty_fd, stderr=tty_fd)
+    finally:
+        os.close(tty_fd)
 
 
 def _edit_diff_with_difftool(diff: str) -> str | None:
     repo_root = get_repo_root()
     git_apply(repo_root, diff)
     try:
-        subprocess.run(["git", "difftool", "-d", "-y"], cwd=repo_root)
+        tty_fd = os.open("/dev/tty", os.O_RDWR)
+        try:
+            subprocess.run(
+                ["git", "difftool", "-d", "-y"],
+                cwd=repo_root,
+                stdin=tty_fd,
+                stdout=tty_fd,
+                stderr=tty_fd,
+            )
+        finally:
+            os.close(tty_fd)
         return get_diff(repo_root) or None
     finally:
         subprocess.run(
@@ -58,10 +75,9 @@ async def review(contexts: list[Context], arg: None = None) -> list[Context]:
         for i, ctx in enumerate(contexts, 1):
             console.rule(f"[bold]{i}/{total}[/bold]")
             console.print()
-            console.print(Markdown(ctx.value))
+            console.print(Markdown(ctx.value.strip()))
             if ctx.diff:
                 console.print(Syntax(ctx.diff, "diff", theme="ansi_dark"))
-            console.print()
 
             with tempfile.TemporaryDirectory() as tmp:
                 value_path = Path(tmp) / "value.md"
@@ -78,6 +94,8 @@ async def review(contexts: list[Context], arg: None = None) -> list[Context]:
                     hint.append(" keep  ")
                     hint.append(" s ", style="bold reverse")
                     hint.append(" skip")
+                    console.print()
+                    console.rule(style="dim")
                     console.print(hint)
 
                     key = _getch()
@@ -86,7 +104,7 @@ async def review(contexts: list[Context], arg: None = None) -> list[Context]:
                     if key == "e":
                         _open_editor(value_path)
                         ctx = replace(ctx, value=value_path.read_text())
-                        console.print(Markdown(ctx.value))
+                        console.print(Markdown(ctx.value.strip()))
                     elif key == "d" and ctx.diff:
                         ctx = replace(ctx, diff=_edit_diff_with_difftool(ctx.diff))
                         if ctx.diff:
